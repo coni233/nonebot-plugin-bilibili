@@ -31,6 +31,11 @@ nonebot-plugin-apscheduler>=0.5.0
 ### 安装插件
 
 将 `nonebot_plugin_bilibili` 文件夹复制到项目的插件目录：
+# 方式一（nb-cli）
+nb install nonebot-plugin-bilibili
+
+# 方式二（pip）
+pip install nonebot-plugin-bilibili
 
 ```toml
 [tool.nonebot.plugins]
