@@ -32,8 +32,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your/nonebot-plugin-bilibili"
-Repository = "https://github.com/your/nonebot-plugin-bilibili"
+Homepage = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
+Repository = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
 "NoneBot Store" = "https://registry.nonebot.dev/plugin/nonebot-plugin-bilibili"
 
 [tool.nonebot]
