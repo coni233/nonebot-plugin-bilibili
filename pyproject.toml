@@ -9,7 +9,7 @@ description = "Bilibili 动态/直播 订阅推送插件 for NoneBot2"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "nonebot-plugin-bilibili", email = ""}
+    {name = "mengbingnaixi", email = "mengbingnaixi@users.noreply.github.com"}
 ]
 requires-python = ">=3.10, <4.0"
 keywords = ["nonebot", "bilibili", "b站", "动态", "直播"]
