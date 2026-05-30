@@ -34,7 +34,7 @@ nonebot-plugin-apscheduler>=0.5.0
 
 ```toml
 [tool.nonebot.plugins]
-"@local" = ["nonebot_plugin_bilibili"]
+"nonebot-plugin-bilibili" = ["nonebot_plugin_bilibili"]
 ```
 
 ### 安装依赖
