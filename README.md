@@ -223,7 +223,7 @@ bilibili_data_dir=/自定义/路径/data/bilibili
 
 ---
 
-## 参考
+## 鸣谢
 
 - [bilibili-dynamic-mirai-plugin](https://github.com/Colter23/bilibili-dynamic-mirai-plugin)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
