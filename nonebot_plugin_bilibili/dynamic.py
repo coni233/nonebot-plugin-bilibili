@@ -13,6 +13,7 @@ require("nonebot_plugin_htmlrender")
 from nonebot_plugin_apscheduler import scheduler
 
 from .client import bili_client
+from .config import BiliCheckConfig
 from .model import sub_storage, user_storage
 from .utils import (
     format_timestamp,
@@ -112,19 +113,6 @@ class DynamicMessage:
                 if isinstance(summary, dict):
                     return rich_text_to_html(summary.get("rich_text_nodes", []))
                 return summary if summary else ""
-            archive = major.get("archive")
-            if archive:
-                return archive.get("title", "")
-            article = major.get("article")
-            if article:
-                return article.get("title", "")
-        return ""
-        major = dynamic.get("major", {})
-        if major:
-            mt = major.get("type", "")
-            if mt == "MAJOR_TYPE_OPUS":
-                opus = major.get("opus", {})
-                return opus.get("summary", {}).get("text", "")
             archive = major.get("archive")
             if archive:
                 return archive.get("title", "")
@@ -335,8 +323,10 @@ class DynamicChecker:
         if not groups:
             return
 
-        # 缓存UP主名称
+        # 缓存UP主名称和头像
         user_storage.set_name(mid, msg.name)
+        if msg.avatar:
+            user_storage.set_face(mid, msg.avatar)
 
         # 获取bot
         try:
@@ -359,12 +349,21 @@ class DynamicChecker:
                     import jinja2
                     import os
 
+                    # 使用群自定义模板：视频动态优先使用 template_video
+                    tpl_key = "template_dynamic"
+                    if msg.type_str == "DYNAMIC_TYPE_AV":
+                        tpl_key = "template_video"
+                    tpl_name = sub_storage.get(group_id, {}).get(tpl_key, "") or \
+                               sub_storage.get(group_id, {}).get("template_dynamic", "") or \
+                               "dynamic.html"
+                    if not tpl_name.endswith(".html"):
+                        tpl_name += ".html"
                     template_dir = os.path.join(os.path.dirname(__file__), "templates")
                     env = jinja2.Environment(
                         loader=jinja2.FileSystemLoader(template_dir),
                         autoescape=True,
                     )
-                    template = env.get_template("dynamic.html")
+                    template = env.get_template(tpl_name)
                     html = template.render(**msg.template_data)
                     pic_bytes = await html_to_pic(html, viewport={"width": 580, "height": 10})
                     pic_b64 = "base64://" + base64.b64encode(pic_bytes).decode()
@@ -410,11 +409,20 @@ dynamic_checker = DynamicChecker()
 
 def start_dynamic_checker():
     """启动动态定时检测"""
+    from nonebot import get_driver
+    try:
+        config = get_driver().config
+        check_cfg = getattr(config, "bili_check", BiliCheckConfig())
+        if isinstance(check_cfg, dict):
+            check_cfg = BiliCheckConfig(**check_cfg)
+        interval = getattr(check_cfg, "interval", 15)
+    except Exception:
+        interval = 15
     scheduler.add_job(
         dynamic_checker.check,
         "interval",
-        seconds=15,
+        seconds=interval,
         id="bilibili_dynamic_check",
         misfire_grace_time=30,
     )
-    logger.info("B站动态检测已启动(15秒间隔)")
+    logger.info(f"B站动态检测已启动({interval}秒间隔)")

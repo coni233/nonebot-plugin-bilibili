@@ -13,6 +13,7 @@ require("nonebot_plugin_htmlrender")
 from nonebot_plugin_apscheduler import scheduler
 
 from .client import bili_client
+from .config import BiliCheckConfig
 from .model import sub_storage, user_storage
 from .utils import live_link, format_timestamp, format_time_full, format_number
 
@@ -22,6 +23,7 @@ class LiveChecker:
 
     def __init__(self):
         self._live_status: Dict[int, bool] = {}  # uid -> is_living
+        self._live_cache: Dict[int, dict] = {}   # uid -> 开播时缓存的信息
         self._running = False
 
     async def check(self):
@@ -74,8 +76,11 @@ class LiveChecker:
             was_living = self._live_status.get(uid, False)
 
             if is_living and not was_living:
-                # 开播通知
+                # 开播通知 — 缓存信息供下播用
                 self._live_status[uid] = True
+                self._live_cache[uid] = {
+                    "name": info.get("uname", user_storage.get_name(uid)),
+                }
                 await self._push_live_start(bot, uid, info)
             elif not is_living and was_living:
                 # 下播通知
@@ -108,6 +113,8 @@ class LiveChecker:
         # 更新缓存
         if name:
             user_storage.set_name(uid, name)
+        if face:
+            user_storage.set_face(uid, face)
 
         # 模板数据
         template_data = {
@@ -180,7 +187,9 @@ class LiveChecker:
 
     async def _push_live_end(self, bot, uid: int, info: dict):
         """推送下播通知"""
-        name = info.get("uname", user_storage.get_name(uid))
+        # 优先使用开播时缓存的名字，再 fallback 到 API 或本地缓存
+        cached = self._live_cache.pop(uid, {})
+        name = cached.get("name") or info.get("uname", user_storage.get_name(uid))
         groups = sub_storage.get_groups_for_uid(uid)
         if not groups:
             return
@@ -205,12 +214,21 @@ live_checker = LiveChecker()
 
 def start_live_checker():
     """启动直播定时检测"""
+    from nonebot import get_driver
+    try:
+        config = get_driver().config
+        check_cfg = getattr(config, "bili_check", BiliCheckConfig())
+        if isinstance(check_cfg, dict):
+            check_cfg = BiliCheckConfig(**check_cfg)
+        interval = getattr(check_cfg, "live_interval", 15)
+    except Exception:
+        interval = 15
     scheduler.add_job(
         live_checker.check,
         "interval",
-        seconds=15,
+        seconds=interval,
         id="bilibili_live_check",
         misfire_grace_time=30,
         max_instances=2,
     )
-    logger.info("B站直播检测已启动(15秒间隔)")
+    logger.info(f"B站直播检测已启动({interval}秒间隔)")

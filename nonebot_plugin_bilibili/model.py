@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from enum import Enum
 from typing import Dict, List, Optional, Set
-from dataclasses import dataclass, field, asdict
 
 from nonebot.log import logger
 
@@ -53,36 +52,6 @@ def get_data_dir() -> Path:
         pass
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
-
-
-# ========== 订阅数据结构 ==========
-
-@dataclass
-class SubUser:
-    """订阅的UP主信息"""
-    uid: int
-    name: str = ""
-    group: str = ""  # 所属分组
-
-
-@dataclass
-class GroupSubData:
-    """一个群/好友的订阅数据"""
-    uids: List[int] = field(default_factory=list)  # 订阅的UP主UID列表
-
-@dataclass
-class FilterRule:
-    """过滤规则"""
-    type: str = "regex"  # regex | type
-    mode: str = "black"  # black | white
-    keyword: str = ""
-
-
-@dataclass
-class GroupFilter:
-    """群过滤配置"""
-    rules: List[FilterRule] = field(default_factory=list)
-    enabled: bool = True
 
 
 # ========== 文件持久化 ==========
@@ -222,7 +191,6 @@ class SubStorage(JsonStorage):
         """设置@全体类型
         与 bilibili-dynamic-mirai-plugin 的 AtAllService 逻辑一致
         """
-        from .model import AtAllType
 
         if group_id not in self._data:
             self._data[group_id] = {"uids": [], "atall": {}}
@@ -308,6 +276,17 @@ class UserInfoStorage(JsonStorage):
 
     def get_name(self, uid: int) -> str:
         return self._data.get(str(uid), {}).get("name", "")
+
+    def get_face(self, uid: int) -> str:
+        return self._data.get(str(uid), {}).get("face", "")
+
+    def set_face(self, uid: int, face: str):
+        if face:
+            key = str(uid)
+            if key not in self._data:
+                self._data[key] = {}
+            self._data[key]["face"] = face
+            self.save()
 
     def set_name(self, uid: int, name: str):
         key = str(uid)

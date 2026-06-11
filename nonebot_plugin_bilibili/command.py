@@ -218,7 +218,7 @@ async def login_command(event: MessageEvent, matcher: Matcher):
     cookie = await poll_login(qrcode_key)
     if cookie:
         await reply(event, "✅ 登录成功！Cookie已保存", matcher)
-        logger.success(f"B站登录成功: UID={sub_storage.get('uid', '?')}")
+        logger.success(f"B站登录成功: UID={cookie_storage.uid}")
     else:
         await reply(event, "❌ 登录超时或失败，请重试", matcher)
 
@@ -244,6 +244,10 @@ async def add_command(event: MessageEvent, matcher: Matcher, uid: int, target: s
         user_info = await bili_client.get_user_info(uid)
         name = user_info.get("name", str(uid)) if user_info else str(uid)
         user_storage.set_name(uid, name)
+        if user_info:
+            face = user_info.get("face", "")
+            if face:
+                user_storage.set_face(uid, face)
     except Exception as e:
         logger.warning(f"获取用户信息失败: {e}")
         name = str(uid)

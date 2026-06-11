@@ -19,7 +19,7 @@ from . import command  # noqa: F401, 注册命令
 from . import web  # noqa: F401, 注册后台路由
 
 __plugin_meta__ = PluginMetadata(
-    name="B站通知助手",
+    name="B站通知插件",
     description="Bilibili 动态/直播 订阅推送",
     usage=(
         "/bili help - 显示帮助\n"

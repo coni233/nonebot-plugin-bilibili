@@ -2,16 +2,11 @@
 
 import hashlib
 import time
-import warnings
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
 import httpx
 from nonebot.log import logger
-
-# 关闭 SSL 证书验证警告
-warnings.filterwarnings("ignore", category=Warning, module="urllib3")
-warnings.filterwarnings("ignore", category=Warning, module="httpx")
 
 from .api import USER_INFO
 from .model import cookie_storage
@@ -20,9 +15,9 @@ from .model import cookie_storage
 class BiliClient:
     """Bilibili API HTTP 客户端"""
 
-    def __init__(self):
+    def __init__(self, verify: bool = True):
         self._client = httpx.AsyncClient(
-            verify=False,
+            verify=verify,
             timeout=httpx.Timeout(15.0),
             headers={
                 "User-Agent": (
@@ -157,6 +152,43 @@ class BiliClient:
             "https://api.bilibili.com/x/space/wbi/acc/info",
             params={"mid": uid},
             use_wbi=True,
+        )
+        if data.get("code") == 0:
+            return data.get("data")
+        return None
+
+    async def get_dynamic_detail(self, did: str) -> Optional[Dict]:
+        """获取单条动态详情"""
+        data = await self.get(
+            "https://api.bilibili.com/x/polymer/web-dynamic/v1/detail",
+            params={"id": did},
+        )
+        if data.get("code") == 0:
+            return data.get("data")
+        return None
+
+    async def get_video_detail(self, bvid: str = "", aid: int = 0) -> Optional[Dict]:
+        """获取视频详情"""
+        params = {}
+        if bvid:
+            params["bvid"] = bvid
+        elif aid:
+            params["aid"] = aid
+        else:
+            return None
+        data = await self.get(
+            "https://api.bilibili.com/x/web-interface/view",
+            params=params,
+        )
+        if data.get("code") == 0:
+            return data.get("data")
+        return None
+
+    async def get_live_room_info(self, room_id: int) -> Optional[Dict]:
+        """获取直播间信息"""
+        data = await self.get(
+            "https://api.live.bilibili.com/room/v1/Room/get_info",
+            params={"room_id": room_id},
         )
         if data.get("code") == 0:
             return data.get("data")
