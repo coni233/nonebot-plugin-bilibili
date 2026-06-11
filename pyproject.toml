@@ -19,16 +19,15 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "httpx>=0.28.0",
     "nonebot-adapter-onebot>=2.4.6",
     "nonebot-plugin-apscheduler>=0.5.0",
     "nonebot_plugin_localstore>=0.7.1",
     "nonebot-plugin-htmlrender>=0.6.7",
-    "nonebot2>=2.5.0",
+    "nonebot2[fastapi,httpx]>=2.5.0"
     "jinja2>=3.0",
     "qrcode>=7.4",
 ]
-version = "1.0.6"
+version = "1.0.7"
 
 [project.urls]
 Homepage = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
