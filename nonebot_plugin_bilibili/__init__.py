@@ -30,7 +30,7 @@ __plugin_meta__ = PluginMetadata(
         "/bili login - 扫码登录"
     ),
     type="application",
-    homepage="https://github.com/your/bilibili-plugin",
+    homepage="https://github.com/mengbingnaixi/nonebot-plugin-bilibili",
     supported_adapters={"~onebot.v11"},
 )
 
