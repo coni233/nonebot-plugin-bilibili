@@ -30,7 +30,7 @@ dependencies = [
 version = "1.0.7"
 
 [project.urls]
-Homepage = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
+homepage = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
 Repository = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
 Documentation = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili#readme"
 Issues = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili/issues"
