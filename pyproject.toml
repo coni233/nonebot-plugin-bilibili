@@ -46,6 +46,9 @@ plugins = ["nonebot_plugin_bilibili"]
 plugin_dirs = []
 builtin_plugins = []
 
+[tool.pdm.scripts]
+post_install = "playwright install chromium"
+
 [tool.pdm]
 distribution = true
 
