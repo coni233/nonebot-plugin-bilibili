@@ -27,7 +27,7 @@ dependencies = [
     "jinja2>=3.0",
     "qrcode>=7.4",
 ]
-version = "1.0.8"
+version = "1.0.9"
 
 [project.urls]
 homepage = "https://github.com/mengbingnaixi/nonebot-plugin-bilibili"
