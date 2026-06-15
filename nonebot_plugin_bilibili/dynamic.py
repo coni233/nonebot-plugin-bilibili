@@ -315,6 +315,11 @@ class DynamicChecker:
 
     async def _push(self, item: dict):
         """推送一条动态到订阅群"""
+        # 跳过直播类型动态（由 LiveChecker 处理）
+        type_str = item.get("type", "")
+        if type_str in ("DYNAMIC_TYPE_LIVE", "DYNAMIC_TYPE_LIVE_RCMD"):
+            return
+
         msg = DynamicMessage(item)
 
         # 获取订阅了该UP主的所有群
@@ -349,10 +354,16 @@ class DynamicChecker:
                     import jinja2
                     import os
 
-                    # 使用群自定义模板：视频动态优先使用 template_video
-                    tpl_key = "template_dynamic"
-                    if msg.type_str == "DYNAMIC_TYPE_AV":
-                        tpl_key = "template_video"
+                    # 使用群自定义模板：按动态子类型选择模板
+                    _tpl_type_map = {
+                        "DYNAMIC_TYPE_AV": "video",
+                        "DYNAMIC_TYPE_PGC": "video",
+                        "DYNAMIC_TYPE_PGC_UNION": "video",
+                        "DYNAMIC_TYPE_UGC_SEASON": "video",
+                        "DYNAMIC_TYPE_MUSIC": "video",
+                    }
+                    tpl_key = _tpl_type_map.get(msg.type_str, "dynamic")
+                    tpl_key = f"template_{tpl_key}"
                     tpl_name = sub_storage.get(group_id, {}).get(tpl_key, "") or \
                                sub_storage.get(group_id, {}).get("template_dynamic", "") or \
                                "dynamic.html"

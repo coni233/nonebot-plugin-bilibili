@@ -4,6 +4,14 @@ Bilibili 动态/直播 订阅通知插件 for NoneBot2
 参考 bilibili-dynamic-mirai-plugin v3 设计
 """
 
+import os
+
+# 确保 htmlrender 后端配置（在驱动加载前设置环境变量）
+# 兼容旧版 (render_backend) 和新版 (htmlrender_browser) 配置键
+for env_key in ("HTMLRENDER_RENDER_BACKEND", "HTMLRENDER_BROWSER", "RENDER_BACKEND"):
+    if env_key not in os.environ:
+        os.environ[env_key] = "playwright"
+
 from nonebot import get_driver, load_plugin, require
 from nonebot.log import logger
 from nonebot.plugin import PluginMetadata

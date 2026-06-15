@@ -564,15 +564,23 @@ async def api_push(request: Request):
             dyn_info = await bili_client.get_dynamic_detail(raw_id)
             if dyn_info and dyn_info.get("item"):
                 item = dyn_info["item"]
-                msg = DynamicMessage(item)
-                uid = msg.mid
-                title = msg.name
-                # 根据动态子类型选择模板：视频/动态/其他
-                if msg.type_str == "DYNAMIC_TYPE_AV":
-                    push_type = "video"
+                # 跳过直播类型动态，走直播间检测
+                if item.get("type", "") in ("DYNAMIC_TYPE_LIVE", "DYNAMIC_TYPE_LIVE_RCMD"):
+                    dyn_info = None
                 else:
-                    push_type = "dynamic"
-                template_data = msg.template_data
+                    msg = DynamicMessage(item)
+                    uid = msg.mid
+                    title = msg.name
+                    # 根据动态子类型选择模板：视频/动态/其他
+                    _tpl_map = {
+                        "DYNAMIC_TYPE_AV": "video",
+                        "DYNAMIC_TYPE_PGC": "video",
+                        "DYNAMIC_TYPE_PGC_UNION": "video",
+                        "DYNAMIC_TYPE_UGC_SEASON": "video",
+                        "DYNAMIC_TYPE_MUSIC": "video",
+                    }
+                    push_type = _tpl_map.get(msg.type_str, "dynamic")
+                    template_data = msg.template_data
             else:
                 # 再尝试直播间
                 room_id = int(raw_id)
