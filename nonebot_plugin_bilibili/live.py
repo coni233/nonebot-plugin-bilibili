@@ -34,9 +34,12 @@ class LiveChecker:
         try:
             subscribed_uids = sub_storage.get_all_uids()
             if not subscribed_uids:
+                logger.debug("直播检测: 无订阅UID，跳过")
                 return
 
             uid_list = list(subscribed_uids)
+            logger.debug(f"直播检测: 查询 {len(uid_list)} 个UID")
+
             # 分批查询，每批最多50个
             for i in range(0, len(uid_list), 50):
                 batch = uid_list[i : i + 50]
@@ -52,11 +55,13 @@ class LiveChecker:
         """检查一批用户的直播状态"""
         data = await bili_client.get_live_status(uids)
         if not data:
+            logger.debug(f"直播检测: 批量查询 {len(uids)} UIDs 无数据返回")
             return
 
         try:
             bot = get_bot()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"直播检测: 获取Bot失败 ({e})，跳过本批次推送")
             return
 
         for uid_str, info in data.items():
@@ -68,12 +73,16 @@ class LiveChecker:
             if not info:
                 continue
 
-            # 调试: 打印直播数据字段，确认 cover 字段名
-            logger.debug(f"直播数据 uid={uid}: title={info.get('title','')} cover_from_user= {'有' if info.get('cover_from_user') else '空'} cover= {'有' if info.get('cover') else '空'} user_cover= {'有' if info.get('user_cover') else '空'} face= {'有' if info.get('face') else '空'} live_status={info.get('live_status')}")
-
             live_status = info.get("live_status", 0)
             is_living = live_status == 1
             was_living = self._live_status.get(uid, False)
+            name = info.get("uname", user_storage.get_name(uid))
+
+            # 状态变化时 INFO，否则 DEBUG
+            if is_living != was_living:
+                logger.info(f"直播状态变化 uid={uid}({name}): {'🔴开播' if is_living else '⚫下播'}")
+            else:
+                logger.info(f"直播检测 uid={uid}({name}): live_status={live_status} (未开播)" if not is_living else f"直播检测 uid={uid}({name}): 正在直播中")
 
             if is_living and not was_living:
                 # 开播通知 — 缓存信息供下播用
@@ -214,21 +223,15 @@ live_checker = LiveChecker()
 
 def start_live_checker():
     """启动直播定时检测"""
-    from nonebot import get_driver
-    try:
-        config = get_driver().config
-        check_cfg = getattr(config, "bili_check", BiliCheckConfig())
-        if isinstance(check_cfg, dict):
-            check_cfg = BiliCheckConfig(**check_cfg)
-        interval = getattr(check_cfg, "live_interval", 15)
-    except Exception:
-        interval = 15
+    from nonebot_plugin_bilibili import plugin_config
+    interval = plugin_config.check.live_interval
     scheduler.add_job(
         live_checker.check,
         "interval",
         seconds=interval,
         id="bilibili_live_check",
+        replace_existing=True,
         misfire_grace_time=30,
-        max_instances=2,
+        max_instances=1,
     )
     logger.info(f"B站直播检测已启动({interval}秒间隔)")

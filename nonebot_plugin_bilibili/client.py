@@ -102,9 +102,9 @@ class BiliClient:
     ) -> Dict[str, Any]:
         """发起请求"""
         headers = {"Cookie": self._cookie_str}
-        if params is None:
-            params = {}
         if use_wbi:
+            if params is None:
+                params = {}
             await self._ensure_wbi()
             params = self._wbi_sign({k: str(v) for k, v in params.items()})
         try:
@@ -195,7 +195,7 @@ class BiliClient:
         return None
 
     async def get_new_dynamic(self, page: int = 1) -> Optional[Dict]:
-        """获取最新动态feed"""
+        """获取最新动态feed（关注列表 — 仅用于 Web 后台查看）"""
         data = await self.get(
             "https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all",
             params={
@@ -209,18 +209,45 @@ class BiliClient:
             return data.get("data")
         return None
 
+    async def get_user_dynamics(self, uid: int, offset: str = "") -> Optional[Dict]:
+        """获取指定用户的空间动态（不依赖关注关系）"""
+        params: Dict[str, Any] = {
+            "host_mid": uid,
+            "features": "itemOpusStyle",
+        }
+        if offset:
+            params["offset"] = offset
+        data = await self.get(
+            "https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space",
+            params=params,
+        )
+        code = data.get("code")
+        if code == 0:
+            result = data.get("data")
+            items_count = len(result.get("items", [])) if result else 0
+            has_more = result.get("has_more", "N/A") if result else "N/A"
+            logger.debug(f"获取用户 {uid} 空间动态: code=0 items={items_count} has_more={has_more}")
+            return result
+        # 412 = 风控/未登录, -101 = 账号未登录, -404 = 用户不存在
+        logger.warning(f"获取用户 {uid} 空间动态失败: code={code} msg={data.get('message','?')} full_resp_keys={list(data.keys()) if data else 'None'}")
+        return None
+
     async def get_live_status(self, uids: list) -> Optional[Dict]:
         """批量获取直播状态"""
         if not uids:
             return None
-        # 构建 uids[] 参数（用列表传多个同key参数，避免dict覆盖）
-        import urllib.parse
-        params_str = "&".join([f"uids[]={urllib.parse.quote(str(uid))}" for uid in uids])
+        # httpx 原生支持多值参数：dict value 传 list 即可
         data = await self.get(
-            f"https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids?{params_str}",
+            "https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids",
+            params={"uids[]": [str(uid) for uid in uids]},
         )
-        if data.get("code") == 0:
-            return data.get("data")
+        code = data.get("code")
+        if code == 0:
+            result = data.get("data")
+            uid_count = len(result) if result else 0
+            logger.debug(f"直播状态查询: code=0 返回 {uid_count} 个用户数据 keys={list(result.keys())[:5] if result else '[]'}")
+            return result
+        logger.warning(f"直播状态查询失败: code={code} msg={data.get('message','?')} uids={uids}")
         return None
 
     async def is_follow(self, uid: int) -> Optional[Dict]:

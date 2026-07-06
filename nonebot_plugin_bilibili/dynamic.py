@@ -246,53 +246,81 @@ class DynamicChecker:
         self._running = False
 
     async def check(self):
-        """执行一次动态检测"""
+        """执行一次动态检测 — 按 UID 逐个查询空间动态（不依赖关注关系）"""
         if self._running:
             return
         self._running = True
         try:
-            # 1. 获取订阅了哪些UP主
+            # 1. 获取所有已订阅 UID 及其群组订阅时间
             subscribed_uids = sub_storage.get_all_uids()
             if not subscribed_uids:
+                logger.debug("动态检测: 无订阅UID，跳过")
                 return
 
-            # 2. 拉取最新动态
-            data = await bili_client.get_new_dynamic()
-            if not data:
-                return
+            logger.info(f"动态检测开始: 订阅UID数={len(subscribed_uids)}")
 
-            items = data.get("items", [])
-            if not items:
-                return
+            # 2. 按 UID 逐个拉取空间动态（避免关注列表限制）
+            all_new_items: List[dict] = []
+            uid_results: dict = {}  # 记录每个 UID 的拉取结果
+            for uid in subscribed_uids:
+                try:
+                    data = await bili_client.get_user_dynamics(uid)
+                    if not data:
+                        uid_results[int(uid)] = {"fetched": 0, "new": 0, "error": "API返回空"}
+                        continue
 
-            # 3. 过滤出新动态（已订阅 + 未处理）
-            new_items = []
-            for item in items:
-                mid = self._get_mid(item)
-                if mid not in subscribed_uids:
-                    continue
-                did = item.get("id_str", "")
-                if not did or did in self._history:
-                    continue
-                new_items.append(item)
+                    items = data.get("items", [])
+                    new_count = 0
 
-            if not new_items:
-                return
+                    # 获取该 UID 在各群中最早的订阅时间（用于过滤旧动态）
+                    groups = sub_storage.get_groups_for_uid(uid)
+                    sub_times = [sub_storage.get_sub_time(g, uid) for g in groups]
+                    min_sub_time = min(sub_times) if sub_times else 0
 
-            # 4. 按时间排序
-            new_items.sort(key=lambda x: self._get_pub_ts(x))
+                    # 3. 过滤：去重 + 去旧（pub_ts 必须 >= 订阅时间）
+                    for item in items:
+                        did = item.get("id_str", "")
+                        if not did or did in self._history:
+                            continue
+                        pub_ts = self._get_pub_ts(item)
+                        if min_sub_time > 0 and pub_ts < min_sub_time:
+                            continue
+                        all_new_items.append(item)
+                        self._history.add(did)
+                        new_count += 1
 
-            # 5. 记录到历史
-            for item in new_items:
-                did = item.get("id_str", "")
-                if did:
-                    self._history.add(did)
+                    uid_results[int(uid)] = {"fetched": len(items), "new": new_count}
+                    await asyncio.sleep(0.8)  # 请求间隔，避免风控
+
+                except Exception as e:
+                    logger.error(f"动态检测: uid={uid} 查询失败: {e}")
+
+            # 汇总本次检测结果
+            if uid_results:
+                parts = []
+                for u, info in uid_results.items():
+                    err = info.get("error", "")
+                    if err:
+                        parts.append(f"uid={u}({err})")
+                    else:
+                        parts.append(f"uid={u}(拉取{info['fetched']}条/新{info['new']}条)")
+                logger.info(f"动态检测汇总: {'; '.join(parts)}")
+
             # 限制历史大小
             if len(self._history) > self._history_max:
                 self._history = set(list(self._history)[-self._history_max:])
 
-            # 6. 推送
-            for item in new_items:
+            if not all_new_items:
+                logger.debug("动态检测: 无新动态需要推送")
+                return
+
+            # 4. 按时间排序
+            all_new_items.sort(key=lambda x: self._get_pub_ts(x))
+
+            logger.info(f"动态检测: 发现 {len(all_new_items)} 条新动态待推送")
+
+            # 5. 推送
+            for item in all_new_items:
                 await self._push(item)
                 await asyncio.sleep(0.5)  # 间隔，避免风控
 
@@ -420,20 +448,14 @@ dynamic_checker = DynamicChecker()
 
 def start_dynamic_checker():
     """启动动态定时检测"""
-    from nonebot import get_driver
-    try:
-        config = get_driver().config
-        check_cfg = getattr(config, "bili_check", BiliCheckConfig())
-        if isinstance(check_cfg, dict):
-            check_cfg = BiliCheckConfig(**check_cfg)
-        interval = getattr(check_cfg, "interval", 15)
-    except Exception:
-        interval = 15
+    from nonebot_plugin_bilibili import plugin_config
+    interval = plugin_config.check.interval
     scheduler.add_job(
         dynamic_checker.check,
         "interval",
         seconds=interval,
         id="bilibili_dynamic_check",
+        replace_existing=True,
         misfire_grace_time=30,
     )
     logger.info(f"B站动态检测已启动({interval}秒间隔)")

@@ -14,14 +14,21 @@ for env_key in ("HTMLRENDER_RENDER_BACKEND", "HTMLRENDER_BROWSER", "RENDER_BACKE
 
 from nonebot import get_driver, load_plugin, require
 from nonebot.log import logger
-from nonebot.plugin import PluginMetadata
+from nonebot.plugin import PluginMetadata, get_plugin_config
 
-from .model import cookie_storage, sub_storage, user_storage
+from .config import BiliPluginConfig
 
+# ===== 依赖声明（必须在任何 localstore 引用之前）=====
 require("nonebot_plugin_apscheduler")
 require("nonebot_plugin_htmlrender")
 require("nonebot_plugin_localstore")
 # require("nonebot_plugin_alconna")  # 改用 on_command，不依赖 Alconna
+
+# ===== 插件配置（全局唯一实例，仅获取一次）=====
+plugin_config: BiliPluginConfig = get_plugin_config(BiliPluginConfig)
+
+# ===== 数据模型（localstore 已在上面 require，安全导入）=====
+from .model import cookie_storage, sub_storage, user_storage
 
 from . import command  # noqa: F401, 注册命令
 from . import web  # noqa: F401, 注册后台路由
@@ -40,6 +47,7 @@ __plugin_meta__ = PluginMetadata(
     type="application",
     homepage="https://github.com/mengbingnaixi/nonebot-plugin-bilibili",
     supported_adapters={"~onebot.v11"},
+    config=BiliPluginConfig,
 )
 
 driver = get_driver()

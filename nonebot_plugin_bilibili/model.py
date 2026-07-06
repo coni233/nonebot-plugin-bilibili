@@ -31,27 +31,14 @@ class AtAllType(str, Enum):
 
 
 def get_data_dir() -> Path:
-    """获取插件数据目录（项目本地 data/bilibili/）"""
-    # 优先使用项目本地路径: <项目根>/data/bilibili/
-    data_dir = Path("data/bilibili").absolute()
-    # 如果项目根下有 pyproject.toml 或 bot.py，说明找到了项目根
-    # 否则尝试从插件文件位置推算
-    try:
-        plugin_dir = Path(__file__).resolve().parent.parent  # mengbing/
-        if (plugin_dir / "pyproject.toml").exists():
-            data_dir = plugin_dir / "data" / "bilibili"
-    except Exception:
-        pass
-    # 环境变量可覆盖
-    try:
-        from nonebot import get_driver
-        config = get_driver().config
-        if hasattr(config, "bilibili_data_dir") and config.bilibili_data_dir:
-            data_dir = Path(str(config.bilibili_data_dir))
-    except Exception:
-        pass
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
+    """获取插件数据目录（通过 nonebot_plugin_localstore）
+
+    惰性导入：避免模块级别 import nonebot_plugin_localstore
+    在 NoneBot require() 插件之前触发加载。
+    """
+    from nonebot_plugin_localstore import get_plugin_data_dir  # noqa: PLC0415
+
+    return get_plugin_data_dir()
 
 
 # ========== 文件持久化 ==========
