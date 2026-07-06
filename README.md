@@ -71,7 +71,7 @@ SUPERUSERS=["你的QQ号"]
 bilibili_cookie=SESSDATA=xxx;bili_jct=xxx
 
 # ========== 检测设置 ==========
-bilibili_check__interval=15          # 动态检测间隔（秒），默认 15
+bilibili_check__interval=20          # 动态检测间隔（秒），默认 20
 bilibili_check__live_interval=15     # 直播检测间隔（秒），默认 15
 bilibili_check__low_speed=0-0x2      # 低峰时段倍率，格式 "开始小时-结束小时x倍率"
 bilibili_check__timeout=10           # HTTP 请求超时（秒），默认 10
@@ -94,7 +94,7 @@ bilibili_admin=0                     # 管理员 QQ 号，0 表示使用 SUPERUS
 |----------|------|--------|------|
 | `bilibili_admin` | int | `0` | 管理员 QQ 号（`0` 则使用 `SUPERUSERS`） |
 | `bilibili_cookie` | str | `""` | B 站 Cookie（备选，优先使用 Web 扫码） |
-| `bilibili_check__interval` | int | `15` | 动态轮询间隔（秒） |
+| `bilibili_check__interval` | int | `20` | 动态轮询间隔（秒） |
 | `bilibili_check__live_interval` | int | `15` | 直播轮询间隔（秒） |
 | `bilibili_check__low_speed` | str | `0-0x2` | 低峰倍率 `时-时x倍` |
 | `bilibili_check__timeout` | int | `10` | API 请求超时（秒） |
