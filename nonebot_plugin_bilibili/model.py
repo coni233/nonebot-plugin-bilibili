@@ -31,14 +31,13 @@ class AtAllType(str, Enum):
 
 
 def get_data_dir() -> Path:
-    """获取插件数据目录（通过 nonebot_plugin_localstore）
+    """获取插件数据目录
 
-    惰性导入：避免模块级别 import nonebot_plugin_localstore
-    在 NoneBot require() 插件之前触发加载。
+    统一使用 ./data/bilibili/，避免与 localstore 默认路径混用。
     """
-    from nonebot_plugin_localstore import get_plugin_data_dir  # noqa: PLC0415
-
-    return get_plugin_data_dir()
+    data_dir = Path("./data/bilibili").resolve()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 # ========== 文件持久化 ==========

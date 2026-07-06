@@ -15,7 +15,7 @@ class BiliPushConfig(BaseModel):
 
 class BiliCheckConfig(BaseModel):
     """检测配置"""
-    interval: int = 15  # 动态检测间隔(秒)
+    interval: int = 20  # 动态检测间隔(秒)
     live_interval: int = 15  # 直播检测间隔(秒)
     low_speed: str = "0-0x2"  # 低峰时段倍率
     timeout: int = 10  # HTTP超时(秒)
@@ -27,7 +27,7 @@ class BiliPluginConfig(BaseModel):
     .env 配置示例:
         bilibili_admin=0
         bilibili_cookie=SESSDATA=xxx
-        bilibili_check__interval=15
+        bilibili_check__interval=20
         bilibili_check__live_interval=15
         bilibili_check__low_speed=0-0x2
         bilibili_check__timeout=10
