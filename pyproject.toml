@@ -31,7 +31,7 @@ classifiers = [
     "Intended Audience :: Developers",
 ]
 
-dependencies = [—
+dependencies = [
     "nonebot2>=2.5.0",
     "nonebot-adapter-onebot>=2.4.6",
     "nonebot-plugin-apscheduler>=0.5.0",
