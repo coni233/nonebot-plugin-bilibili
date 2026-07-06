@@ -34,11 +34,9 @@ class LiveChecker:
         try:
             subscribed_uids = sub_storage.get_all_uids()
             if not subscribed_uids:
-                logger.debug("直播检测: 无订阅UID，跳过")
                 return
 
             uid_list = list(subscribed_uids)
-            logger.debug(f"直播检测: 查询 {len(uid_list)} 个UID")
 
             # 分批查询，每批最多50个
             for i in range(0, len(uid_list), 50):
@@ -55,7 +53,6 @@ class LiveChecker:
         """检查一批用户的直播状态"""
         data = await bili_client.get_live_status(uids)
         if not data:
-            logger.debug(f"直播检测: 批量查询 {len(uids)} UIDs 无数据返回")
             return
 
         try:
@@ -78,11 +75,9 @@ class LiveChecker:
             was_living = self._live_status.get(uid, False)
             name = info.get("uname", user_storage.get_name(uid))
 
-            # 状态变化时 INFO，否则 DEBUG
+            # 仅记录状态变化
             if is_living != was_living:
                 logger.info(f"直播状态变化 uid={uid}({name}): {'🔴开播' if is_living else '⚫下播'}")
-            else:
-                logger.info(f"直播检测 uid={uid}({name}): live_status={live_status} (未开播)" if not is_living else f"直播检测 uid={uid}({name}): 正在直播中")
 
             if is_living and not was_living:
                 # 开播通知 — 缓存信息供下播用
@@ -141,6 +136,9 @@ class LiveChecker:
         }
 
         for group_id in groups:
+            # 检查@全体(直播) —— 提前到外层，确保 fallback 也能用
+            need_atall = sub_storage.check_atall(group_id, uid, "live")
+
             try:
                 # HTML渲染推送
                 try:
@@ -163,8 +161,6 @@ class LiveChecker:
                     pic_bytes = await html_to_pic(html, viewport={"width": 580, "height": 10})
                     pic_b64 = "base64://" + base64.b64encode(pic_bytes).decode()
 
-                    # 检查@全体(直播)
-                    need_atall = sub_storage.check_atall(group_id, uid, "live")
                     msg_list = [{"type": "image", "data": {"file": pic_b64}}]
                     if need_atall:
                         msg_list.append({"type": "at", "data": {"qq": "all"}})
@@ -183,10 +179,13 @@ class LiveChecker:
                         f"👤 {online} 人气\n"
                         f"🔗 {live_link(room_id)}"
                     )
+                    msg_list = [{"type": "text", "data": {"text": text}}]
+                    if need_atall:
+                        msg_list.append({"type": "at", "data": {"qq": "all"}})
                     await bot.call_api(
                         "send_group_msg",
                         group_id=int(group_id),
-                        message=text,
+                        message=msg_list,
                     )
 
                 logger.info(f"推送开播通知 {name}({uid}) 到群 {group_id}")

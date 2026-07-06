@@ -254,7 +254,6 @@ class DynamicChecker:
             # 1. 获取所有已订阅 UID 及其群组订阅时间
             subscribed_uids = sub_storage.get_all_uids()
             if not subscribed_uids:
-                logger.debug("动态检测: 无订阅UID，跳过")
                 return
 
             logger.info(f"动态检测开始: 订阅UID数={len(subscribed_uids)}")
@@ -311,7 +310,6 @@ class DynamicChecker:
                 self._history = set(list(self._history)[-self._history_max:])
 
             if not all_new_items:
-                logger.debug("动态检测: 无新动态需要推送")
                 return
 
             # 4. 按时间排序
@@ -375,6 +373,15 @@ class DynamicChecker:
                 if filters and any(f.get("keyword", "") in msg.content for f in filters if f.get("keyword")):
                     continue
 
+                # 检查@全体（动态类型 → 映射具体子类型）—— 提前到外层，确保 fallback 也能用
+                atall_type_map = {
+                    "DYNAMIC_TYPE_AV": "video",
+                    "DYNAMIC_TYPE_MUSIC": "music",
+                    "DYNAMIC_TYPE_ARTICLE": "article",
+                }
+                msg_subtype = atall_type_map.get(msg.type_str, "dynamic")
+                need_atall = sub_storage.check_atall(group_id, mid, msg_subtype)
+
                 # 渲染HTML推送
                 try:
                     import base64
@@ -406,14 +413,6 @@ class DynamicChecker:
                     html = template.render(**msg.template_data)
                     pic_bytes = await html_to_pic(html, viewport={"width": 580, "height": 10})
                     pic_b64 = "base64://" + base64.b64encode(pic_bytes).decode()
-                    # 检查@全体（动态类型 → 映射具体子类型）
-                    atall_type_map = {
-                        "DYNAMIC_TYPE_AV": "video",
-                        "DYNAMIC_TYPE_MUSIC": "music",
-                        "DYNAMIC_TYPE_ARTICLE": "article",
-                    }
-                    msg_subtype = atall_type_map.get(msg.type_str, "dynamic")
-                    need_atall = sub_storage.check_atall(group_id, mid, msg_subtype)
                     msg_list = [{"type": "image", "data": {"file": pic_b64}}]
                     if need_atall:
                         msg_list.append({"type": "at", "data": {"qq": "all"}})
@@ -424,15 +423,18 @@ class DynamicChecker:
                     )
                 except Exception as e:
                     logger.warning(f"HTML渲染推送失败，使用纯文本: {e}")
-                    # 纯文本备用
+                    # 纯文本备用，同样检查@全体
                     text = f"📢 {msg.name} {msg.type_text}\n{msg.time}\n\n"
                     if msg.content:
                         text += f"{msg.content[:150]}\n\n"
                     text += f"🔗 {dynamic_link(msg.did)}"
+                    msg_list = [{"type": "text", "data": {"text": text}}]
+                    if need_atall:
+                        msg_list.append({"type": "at", "data": {"qq": "all"}})
                     await bot.call_api(
                         "send_group_msg",
                         group_id=int(group_id),
-                        message=text,
+                        message=msg_list,
                     )
 
                 logger.info(f"推送动态 {msg.did} 到群 {group_id}")

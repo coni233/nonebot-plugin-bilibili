@@ -162,6 +162,7 @@ class BiliClient:
         data = await self.get(
             "https://api.bilibili.com/x/polymer/web-dynamic/v1/detail",
             params={"id": did},
+            use_wbi=True,
         )
         if data.get("code") == 0:
             return data.get("data")
@@ -204,6 +205,7 @@ class BiliClient:
                 "page": page,
                 "features": "itemOpusStyle",
             },
+            use_wbi=True,
         )
         if data.get("code") == 0:
             return data.get("data")
@@ -220,16 +222,13 @@ class BiliClient:
         data = await self.get(
             "https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space",
             params=params,
+            use_wbi=True,
         )
         code = data.get("code")
         if code == 0:
-            result = data.get("data")
-            items_count = len(result.get("items", [])) if result else 0
-            has_more = result.get("has_more", "N/A") if result else "N/A"
-            logger.debug(f"获取用户 {uid} 空间动态: code=0 items={items_count} has_more={has_more}")
-            return result
-        # 412 = 风控/未登录, -101 = 账号未登录, -404 = 用户不存在
-        logger.warning(f"获取用户 {uid} 空间动态失败: code={code} msg={data.get('message','?')} full_resp_keys={list(data.keys()) if data else 'None'}")
+            return data.get("data")
+        # 412 = 风控/未登录, -101 = 账号未登录, -352 = 风控, -404 = 用户不存在
+        logger.warning(f"获取用户 {uid} 空间动态失败: code={code} msg={data.get('message','?')}")
         return None
 
     async def get_live_status(self, uids: list) -> Optional[Dict]:
@@ -243,10 +242,7 @@ class BiliClient:
         )
         code = data.get("code")
         if code == 0:
-            result = data.get("data")
-            uid_count = len(result) if result else 0
-            logger.debug(f"直播状态查询: code=0 返回 {uid_count} 个用户数据 keys={list(result.keys())[:5] if result else '[]'}")
-            return result
+            return data.get("data")
         logger.warning(f"直播状态查询失败: code={code} msg={data.get('message','?')} uids={uids}")
         return None
 

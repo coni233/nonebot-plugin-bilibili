@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-bilibili"
-version = "1.1.0"
+version = "1.1.1"
 description = "Bilibili 动态/直播订阅推送插件 for NoneBot2"
 authors = [
     { name = "mengbingnaixi", email = "mengbingnaixi@users.noreply.github.com" },
@@ -33,6 +33,7 @@ classifiers = [
 
 dependencies = [
     "nonebot2>=2.5.0",
+    "fastapi>=0.100.0",
     "nonebot-adapter-onebot>=2.4.6",
     "nonebot-plugin-apscheduler>=0.5.0",
     "nonebot-plugin-htmlrender>=0.6.7",

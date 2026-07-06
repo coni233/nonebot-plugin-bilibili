@@ -169,6 +169,10 @@ async def bili_handle(
             gid = get_group_id(event)
         else:
             gid = gid.lstrip("-")
+        # list 子命令特殊处理：/bili atall list 只有两个参数
+        if len(p) > 1 and p[1] == "list":
+            await atall_command(event, matcher, "", "list", 0, gid)
+            return
         atype = p[1] if len(p) > 1 else ""
         action = p[2] if len(p) > 2 else ""
         uid = int(p[3]) if len(p) > 3 and p[3].isdigit() else 0
