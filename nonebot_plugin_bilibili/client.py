@@ -52,11 +52,19 @@ class BiliClient:
                 headers={"Cookie": self._cookie_str},
             )
             data = resp.json()
-            if data.get("code") == 0 and data.get("data", {}).get("wbi_img"):
+            code = data.get("code")
+            if code == 0 and data.get("data", {}).get("wbi_img"):
                 self._wbi_img = data["data"]["wbi_img"]
                 self._wbi_fetch_time = now
+                logger.info("WBI签名密钥获取成功")
+            else:
+                login = data.get("data", {}).get("isLogin")
+                logger.warning(
+                    f"获取WBI签名密钥失败: nav返回code={code}, "
+                    f"isLogin={login}, cookie{'有' if self._cookie_str else '无'}"
+                )
         except Exception as e:
-            logger.warning(f"获取WBI img失败: {e}")
+            logger.warning(f"获取WBI签名密钥异常: {e}")
 
     def _wbi_sign(self, params: Dict[str, str]) -> Dict[str, str]:
         """WBI 签名"""
@@ -106,6 +114,8 @@ class BiliClient:
             if params is None:
                 params = {}
             await self._ensure_wbi()
+            if not self._wbi_img:
+                logger.warning(f"WBI密钥不可用，请求 {url.split('?')[0]} 将无签名")
             params = self._wbi_sign({k: str(v) for k, v in params.items()})
         try:
             resp = await self._client.request(

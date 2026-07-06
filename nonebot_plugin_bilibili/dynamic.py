@@ -1,10 +1,12 @@
 """B站通知插件 — 动态定时检测与推送"""
 
 import asyncio
+import json
 from datetime import datetime
 from typing import Dict, List, Optional, Set
 
 from nonebot import get_bot, require
+from nonebot.adapters.onebot.v11 import Message, MessageSegment
 from nonebot.log import logger
 
 require("nonebot_plugin_apscheduler")
@@ -14,7 +16,7 @@ from nonebot_plugin_apscheduler import scheduler
 
 from .client import bili_client
 from .config import BiliCheckConfig
-from .model import sub_storage, user_storage
+from .model import get_data_dir, sub_storage, user_storage
 from .utils import (
     format_timestamp,
     format_time_full,
@@ -241,9 +243,33 @@ class DynamicChecker:
     """动态检测器"""
 
     def __init__(self):
-        self._history: Set[str] = set()  # 已处理的动态ID
+        self._history: Set[str] = set()
         self._history_max = 500
         self._running = False
+        self._history_file = get_data_dir() / "dynamic_history.json"
+        self._load_history()
+
+    def _load_history(self):
+        """从磁盘加载已推送的动态 ID 历史（防止重启后重复推送）"""
+        try:
+            if self._history_file.exists():
+                data = json.loads(self._history_file.read_text("utf-8"))
+                if isinstance(data, list):
+                    self._history = set(data)
+                    logger.info(f"已加载 {len(self._history)} 条动态推送历史")
+        except Exception as e:
+            logger.warning(f"加载动态推送历史失败: {e}")
+
+    def _save_history(self):
+        """保存已推送的动态 ID 历史到磁盘"""
+        try:
+            self._history_file.parent.mkdir(parents=True, exist_ok=True)
+            self._history_file.write_text(
+                json.dumps(list(self._history), ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存动态推送历史失败: {e}")
 
     async def check(self):
         """执行一次动态检测 — 按 UID 逐个查询空间动态（不依赖关注关系）"""
@@ -256,7 +282,6 @@ class DynamicChecker:
             if not subscribed_uids:
                 return
 
-            logger.info(f"动态检测开始: 订阅UID数={len(subscribed_uids)}")
 
             # 2. 按 UID 逐个拉取空间动态（避免关注列表限制）
             all_new_items: List[dict] = []
@@ -303,11 +328,14 @@ class DynamicChecker:
                         parts.append(f"uid={u}({err})")
                     else:
                         parts.append(f"uid={u}(拉取{info['fetched']}条/新{info['new']}条)")
-                logger.info(f"动态检测汇总: {'; '.join(parts)}")
+
 
             # 限制历史大小
             if len(self._history) > self._history_max:
                 self._history = set(list(self._history)[-self._history_max:])
+
+            # 持久化推送历史到磁盘（防止重启后重复推送）
+            self._save_history()
 
             if not all_new_items:
                 return
@@ -382,6 +410,24 @@ class DynamicChecker:
                 msg_subtype = atall_type_map.get(msg.type_str, "dynamic")
                 need_atall = sub_storage.check_atall(group_id, mid, msg_subtype)
 
+                # 验证 @全体 权限 (NapCatQQ 会静默删除无权限时 at 标记)
+                if need_atall:
+                    try:
+                        remain = await bot.call_api("get_group_at_all_remain", group_id=int(group_id))
+                        can_at_all = remain.get("can_at_all", False)
+                        remain_count = remain.get("remain_at_all_count_for_group", 0)
+                        if not can_at_all:
+                            logger.warning(f"[AtAll] 群 {group_id} 无 @全体 权限（bot 需为群主/管理员），已跳过")
+                            need_atall = False
+                        elif remain_count <= 0:
+                            logger.warning(f"[AtAll] 群 {group_id} @全体 次数已用完，已跳过")
+                            need_atall = False
+                        else:
+                            pass  # 有权限，允许发送
+                    except Exception as e:
+                        logger.warning(f"[AtAll] 查询群 {group_id} @全体 权限失败: {e}，跳过 @全体")
+                        need_atall = False
+
                 # 渲染HTML推送
                 try:
                     import base64
@@ -413,29 +459,24 @@ class DynamicChecker:
                     html = template.render(**msg.template_data)
                     pic_bytes = await html_to_pic(html, viewport={"width": 580, "height": 10})
                     pic_b64 = "base64://" + base64.b64encode(pic_bytes).decode()
-                    msg_list = [{"type": "image", "data": {"file": pic_b64}}]
-                    if need_atall:
-                        msg_list.append({"type": "at", "data": {"qq": "all"}})
-                    await bot.call_api(
-                        "send_group_msg",
-                        group_id=int(group_id),
-                        message=msg_list,
-                    )
+                    message = Message(MessageSegment.image(pic_b64))
                 except Exception as e:
                     logger.warning(f"HTML渲染推送失败，使用纯文本: {e}")
-                    # 纯文本备用，同样检查@全体
+                    # 纯文本备用
                     text = f"📢 {msg.name} {msg.type_text}\n{msg.time}\n\n"
                     if msg.content:
                         text += f"{msg.content[:150]}\n\n"
                     text += f"🔗 {dynamic_link(msg.did)}"
-                    msg_list = [{"type": "text", "data": {"text": text}}]
-                    if need_atall:
-                        msg_list.append({"type": "at", "data": {"qq": "all"}})
-                    await bot.call_api(
-                        "send_group_msg",
-                        group_id=int(group_id),
-                        message=msg_list,
-                    )
+                    message = Message(MessageSegment.text(text))
+
+                # @全体 拼入主消息一起发送 (NapCatQQ 拒绝只有 at 的空消息体 retcode=1200)
+                if need_atall:
+                    message = MessageSegment.at("all") + message
+
+                await bot.send_group_msg(
+                    group_id=int(group_id),
+                    message=message,
+                )
 
                 logger.info(f"推送动态 {msg.did} 到群 {group_id}")
 
