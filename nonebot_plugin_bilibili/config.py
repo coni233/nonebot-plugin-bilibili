@@ -27,6 +27,7 @@ class BiliPluginConfig(BaseModel):
     .env 配置示例:
         bilibili_admin=0
         bilibili_cookie=SESSDATA=xxx
+        bilibili_command_priority=5
         bilibili_check__interval=20
         bilibili_check__live_interval=15
         bilibili_check__low_speed=0-0x2
@@ -38,6 +39,7 @@ class BiliPluginConfig(BaseModel):
 
     admin: int = 0  # 超级管理员QQ (0=使用SUPERUSER)
     cookie: str = ""  # bilibili Cookie（备选，优先使用 data/cookie.json）
+    command_priority: int = 5  # /bili 命令响应优先级（越小越高）
     check: BiliCheckConfig = Field(default_factory=BiliCheckConfig)
     push: BiliPushConfig = Field(default_factory=BiliPushConfig)
     web_enable: bool = True  # 网页后台开关

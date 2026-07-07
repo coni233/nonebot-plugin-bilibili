@@ -5,6 +5,7 @@ from pathlib import Path
 from enum import Enum
 from typing import Dict, List, Optional, Set
 
+import nonebot_plugin_localstore as store
 from nonebot.log import logger
 
 
@@ -33,11 +34,10 @@ class AtAllType(str, Enum):
 def get_data_dir() -> Path:
     """获取插件数据目录
 
-    统一使用 ./data/bilibili/，避免与 localstore 默认路径混用。
+    使用 localstore 管理（符合 NoneBot 商店发布规范）。
+    在 .env 中通过 localstore_data_dir 指定根目录。
     """
-    data_dir = Path("./data/bilibili").resolve()
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
+    return store.get_plugin_data_dir()
 
 
 # ========== 文件持久化 ==========

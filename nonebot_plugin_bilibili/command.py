@@ -98,9 +98,14 @@ async def reply(event: MessageEvent, message: str, matcher: Matcher):
 
 # ========== 命令定义 ==========
 
+from nonebot import get_plugin_config
+from .config import BiliPluginConfig
+
+_plugin_config = get_plugin_config(BiliPluginConfig)
+
 # 统一使用 on_command（简单可靠）
 # 注意：不采用 Alconna 是因为 on_alconna + 无 handler 会导致命令无响应
-bili_cmd = on_command("bili", priority=5, block=True)
+bili_cmd = on_command("bili", priority=_plugin_config.command_priority, block=True)
 
 @bili_cmd.handle()
 async def bili_handle(
