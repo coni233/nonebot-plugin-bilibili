@@ -62,6 +62,8 @@ pip install -e nonebot-plugin-bilibili
 
 所有配置通过 `.env` 或 `.env.prod` 设置，使用 `bilibili_` 前缀。嵌套字段以双下划线分隔。
 
+⚠️ **技术说明**：NoneBot 的自研 Settings 实现不支持 pydantic-settings 的 `env_prefix`，插件通过 `model_validator` 手动剥离前缀并展开嵌套字段，确保所有 `bilibili_` 开头的环境变量均能正确加载。
+
 ```dotenv
 # ========== 必填 ==========
 SUPERUSERS=["你的QQ号"]
@@ -69,6 +71,9 @@ SUPERUSERS=["你的QQ号"]
 # ========== B站 Cookie ==========
 # 优先从 Web 后台扫码获取，也可手动填入
 bilibili_cookie=SESSDATA=xxx;bili_jct=xxx
+
+# ========== 数据存储 ==========
+bilibili_data_dir=./data/bilibili    # 插件数据目录（cookie/subscribers/users/dynamic_history.json）
 
 # ========== 检测设置 ==========
 bilibili_check__interval=20          # 动态检测间隔（秒），默认 20
@@ -79,6 +84,9 @@ bilibili_check__timeout=10           # HTTP 请求超时（秒），默认 10
 # ========== 推送设置 ==========
 bilibili_push__message_interval=100  # 同群连续消息间隔（毫秒），默认 100
 bilibili_push__push_interval=500     # 跨群推送间隔（毫秒），默认 500
+
+# ========== 命令 ==========
+bilibili_command_priority=5          # /bili 命令响应优先级（越小越高），默认 5
 
 # ========== Web 后台 ==========
 bilibili_web_enable=true             # 启用 Web 管理后台，默认 true
@@ -94,6 +102,8 @@ bilibili_admin=0                     # 管理员 QQ 号，0 表示使用 SUPERUS
 |----------|------|--------|------|
 | `bilibili_admin` | int | `0` | 管理员 QQ 号（`0` 则使用 `SUPERUSERS`） |
 | `bilibili_cookie` | str | `""` | B 站 Cookie（备选，优先使用 Web 扫码） |
+| `bilibili_data_dir` | str | `./data/bilibili` | 插件数据目录（cookie、订阅、UP缓存、动态历史） |
+| `bilibili_command_priority` | int | `5` | `/bili` 命令响应优先级（越小越高） |
 | `bilibili_check__interval` | int | `20` | 动态轮询间隔（秒） |
 | `bilibili_check__live_interval` | int | `15` | 直播轮询间隔（秒） |
 | `bilibili_check__low_speed` | str | `0-0x2` | 低峰倍率 `时-时x倍` |
@@ -291,14 +301,31 @@ bilibili_admin=0                     # 管理员 QQ 号，0 表示使用 SUPERUS
 
 ## 数据存储
 
-插件通过 `nonebot_plugin_localstore` 管理数据目录，默认路径由 LocalStore 决定。数据结构：
+插件通过 `bilibili_data_dir` 配置项管理数据目录，默认路径为 `./data/bilibili`。数据结构：
 
 ```
-<localstore_data_dir>/
-├── cookie.json        # B 站 Cookie + UID
-├── subscribers.json   # 订阅数据（群 → UP 主列表、@全体、过滤词、模板）
-└── users.json         # UP 主名称和头像缓存
+<bilibili_data_dir>/
+├── cookie.json            # B 站 Cookie + UID
+├── subscribers.json       # 订阅数据（群 → UP 主列表、@全体、过滤词、模板）
+├── users.json             # UP 主名称和头像缓存
+└── dynamic_history.json   # 已推送动态 ID 集合（去重，最多保留 500 条）
 ```
+
+> 需自定义路径时，在 `.env.prod` 中设置 `bilibili_data_dir=./my_data` 即可。
+
+### 风控退避机制
+
+当 Bilibili API 返回 `-352`（请求频率限制）时，插件会自动进入**指数退避冷却**：
+
+```
+第1次 -352 → 冷却 60s，跳过本轮剩余 UID
+第2次 -352 → 冷却 120s
+第3次 -352 → 冷却 240s  （上限 600s）
+...
+某次成功 → 立即重置为 60s
+```
+
+冷却期间不会反复请求 B 站 API，避免触发更长时间的风控。可适当调大 `bilibili_check__interval` 来从源头减少触发概率。
 
 ### subscribers.json 结构
 
@@ -324,8 +351,6 @@ bilibili_admin=0                     # 管理员 QQ 号，0 表示使用 SUPERUS
   }
 }
 ```
-
-需自定义路径时，可设置 `localstore` 的全局配置，或修改 `.env` 中的 `LOCALSTORE_DATA_DIR`。
 
 ---
 
@@ -353,7 +378,7 @@ bilibili_admin=0                     # 管理员 QQ 号，0 表示使用 SUPERUS
 | 二维码 | qrcode（扫码登录） |
 | HTTP 客户端 | httpx（异步请求 B 站 API） |
 | 数据模型 | Pydantic >= 2.0（配置验证） |
-| 数据存储 | JSON 文件（通过 nonebot-plugin-localstore） |
+| 数据存储 | JSON 文件（通过 bilibili_data_dir 配置管理路径） |
 | B 站 API | WBI 签名 + Cookie 认证 |
 
 ---
