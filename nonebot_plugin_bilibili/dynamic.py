@@ -14,7 +14,7 @@ require("nonebot_plugin_htmlrender")
 
 from nonebot_plugin_apscheduler import scheduler
 
-from .client import bili_client
+from .client import bili_client, BiliRateLimitError
 from .config import BiliCheckConfig
 from .model import get_data_dir, sub_storage, user_storage
 from .utils import (
@@ -247,6 +247,7 @@ class DynamicChecker:
         self._history_max = 500
         self._running = False
         self._history_file = get_data_dir() / "dynamic_history.json"
+        self._backoff_sleep = 60  # -352 退避冷却初始值(秒)，成功后重置
         self._load_history()
 
     def _load_history(self):
@@ -293,6 +294,9 @@ class DynamicChecker:
                         uid_results[int(uid)] = {"fetched": 0, "new": 0, "error": "API返回空"}
                         continue
 
+                    # 请求成功 — 重置退避冷却
+                    self._backoff_sleep = 60
+
                     items = data.get("items", [])
                     new_count = 0
 
@@ -315,6 +319,13 @@ class DynamicChecker:
 
                     uid_results[int(uid)] = {"fetched": len(items), "new": new_count}
                     await asyncio.sleep(0.8)  # 请求间隔，避免风控
+
+                except BiliRateLimitError as e:
+                    logger.warning(f"B站 -352 频率限制触发，冷却 {self._backoff_sleep}s 后继续")
+                    uid_results[int(uid)] = {"fetched": 0, "new": 0, "error": f"频率限制(-352)/冷却{self._backoff_sleep}s"}
+                    await asyncio.sleep(self._backoff_sleep)
+                    self._backoff_sleep = min(self._backoff_sleep * 2, 600)  # 指数退避，最大 10 分钟
+                    break  # 跳过本批次剩余 UID
 
                 except Exception as e:
                     logger.error(f"动态检测: uid={uid} 查询失败: {e}")
@@ -444,10 +455,11 @@ class DynamicChecker:
                         "DYNAMIC_TYPE_MUSIC": "video",
                     }
                     tpl_key = _tpl_type_map.get(msg.type_str, "dynamic")
-                    tpl_key = f"template_{tpl_key}"
-                    tpl_name = sub_storage.get(group_id, {}).get(tpl_key, "") or \
+                    tpl_key_name = f"template_{tpl_key}"
+                    _default_tpl = f"{tpl_key}.html"
+                    tpl_name = sub_storage.get(group_id, {}).get(tpl_key_name, "") or \
                                sub_storage.get(group_id, {}).get("template_dynamic", "") or \
-                               "dynamic.html"
+                               _default_tpl
                     if not tpl_name.endswith(".html"):
                         tpl_name += ".html"
                     template_dir = os.path.join(os.path.dirname(__file__), "templates")

@@ -12,6 +12,11 @@ from .api import USER_INFO
 from .model import cookie_storage
 
 
+class BiliRateLimitError(Exception):
+    """B站 API 频率限制 (-352)"""
+    pass
+
+
 class BiliClient:
     """Bilibili API HTTP 客户端"""
 
@@ -237,7 +242,9 @@ class BiliClient:
         code = data.get("code")
         if code == 0:
             return data.get("data")
-        # 412 = 风控/未登录, -101 = 账号未登录, -352 = 风控, -404 = 用户不存在
+        if code == -352:
+            raise BiliRateLimitError(f"请求频率过高 (code=-352, uid={uid})")
+        # 412 = 风控/未登录, -101 = 账号未登录, -404 = 用户不存在
         logger.warning(f"获取用户 {uid} 空间动态失败: code={code} msg={data.get('message','?')}")
         return None
 

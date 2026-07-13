@@ -5,8 +5,6 @@ Bilibili 动态/直播 订阅通知插件 for NoneBot2
 """
 
 import os
-import shutil
-from pathlib import Path
 
 # 确保 htmlrender 后端配置（在驱动加载前设置环境变量）
 # 兼容旧版 (render_backend) 和新版 (htmlrender_browser) 配置键
@@ -20,7 +18,7 @@ from nonebot.plugin import PluginMetadata, get_plugin_config
 
 from .config import BiliPluginConfig
 
-# ===== 依赖声明（必须在任何 localstore 引用之前）=====
+# ===== 依赖声明 =====
 require("nonebot_plugin_apscheduler")
 require("nonebot_plugin_htmlrender")
 require("nonebot_plugin_localstore")
@@ -58,40 +56,6 @@ driver = get_driver()
 @driver.on_startup
 async def _():
     """插件启动时执行"""
-
-    # ===== 数据迁移: 将旧 ./data/bilibili/*.json 迁移到 localstore 插件专属目录 =====
-    import nonebot_plugin_localstore as _store
-
-    old_dir = Path("./data/bilibili").resolve()
-    new_dir = _store.get_plugin_data_dir()
-    data_files = ["cookie.json", "subscribers.json", "users.json", "dynamic_history.json"]
-    migrated_count = 0
-    for filename in data_files:
-        old_file = old_dir / filename
-        new_file = new_dir / filename
-        if old_file.exists() and not new_file.exists():
-            new_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(old_file, new_file)
-            logger.info(f"[迁移] {filename}: {old_file} -> {new_file}")
-            migrated_count += 1
-    if migrated_count:
-        logger.info(f"已从旧目录迁移 {migrated_count} 个数据文件到 localstore 插件目录")
-
-    # 迁移: 为旧数据补充 sub_time
-    import time
-    now = int(time.time())
-    migrated = 0
-    for gid, data in sub_storage.data.items():
-        st = data.setdefault("sub_time", {})
-        for uid in data.get("uids", []):
-            key = str(uid)
-            if key not in st:
-                st[key] = 0  # 0 = 不限，不阻止历史动态
-                migrated += 1
-    if migrated:
-        sub_storage.save()
-        logger.info(f"已迁移 {migrated} 条订阅时间戳")
-
     logger.info("B站通知插件启动中...")
     logger.info(f"Cookie状态: {'已配置' if cookie_storage.cookie else '未配置'}")
     logger.info(
