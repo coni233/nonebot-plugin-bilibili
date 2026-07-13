@@ -60,9 +60,7 @@ pip install -e nonebot-plugin-bilibili
 
 ## 配置
 
-所有配置通过 `.env` 或 `.env.prod` 设置，使用 `bilibili_` 前缀。嵌套字段以双下划线分隔。
-
-⚠️ **技术说明**：NoneBot 的自研 Settings 实现不支持 pydantic-settings 的 `env_prefix`，插件通过 `model_validator` 手动剥离前缀并展开嵌套字段，确保所有 `bilibili_` 开头的环境变量均能正确加载。
+所有配置通过 `.env` 或 `.env.prod` 设置，使用 `bilibili_` 前缀。嵌套字段以双下划线分隔
 
 ```dotenv
 # ========== 必填 ==========
