@@ -119,4 +119,9 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.nonebot]
-plugins = ["nonebot-plugin-bilibili"]
+adapters = [
+    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" },
+]
+plugins = ["nonebot_plugin_bilibili"]
+plugin_dirs = []
+builtin_plugins = []
