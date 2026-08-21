@@ -80,7 +80,18 @@ CREATE TABLE IF NOT EXISTS delivery_receipts (
     delivered_at INTEGER NOT NULL,
     PRIMARY KEY (namespace, uid, content_key, group_id)
 );
+
+CREATE TABLE IF NOT EXISTS delivery_claims (
+    namespace TEXT NOT NULL,
+    uid INTEGER NOT NULL,
+    content_key TEXT NOT NULL,
+    group_id INTEGER NOT NULL,
+    claimed_at INTEGER NOT NULL,
+    PRIMARY KEY (namespace, uid, content_key, group_id)
+);
 """
+
+DELIVERY_CLAIM_TTL = 300
 
 
 class Repository:
@@ -206,6 +217,7 @@ class Repository:
             await db.execute("DELETE FROM overrides")
             await db.execute("DELETE FROM states WHERE namespace IN ('dynamic', 'live')")
             await db.execute("DELETE FROM delivery_receipts")
+            await db.execute("DELETE FROM delivery_claims")
             await db.commit()
             return cursor.rowcount
 
@@ -222,6 +234,7 @@ class Repository:
                 (str(uid),),
             )
             await db.execute("DELETE FROM delivery_receipts WHERE uid=?", (uid,))
+            await db.execute("DELETE FROM delivery_claims WHERE uid=?", (uid,))
 
     async def list_subscriptions(self, group_id: int | None = None) -> list[Subscription]:
         query = """SELECT s.group_id, s.uid, s.uname, s.avatar,
@@ -462,6 +475,44 @@ class Repository:
                 ON CONFLICT(namespace, uid, content_key, group_id) DO UPDATE SET
                     delivered_at=excluded.delivered_at""",
                 (namespace, uid, content_key, group_id, int(time.time())),
+            )
+            await db.commit()
+
+    async def claim_delivery(
+        self, namespace: str, uid: int, content_key: str, group_id: int
+    ) -> bool:
+        """Atomically reserve one delivery across concurrent jobs or processes."""
+        now = int(time.time())
+        async with self._connect() as db:
+            await db.execute(
+                """DELETE FROM delivery_claims
+                WHERE namespace=? AND uid=? AND content_key=? AND group_id=?
+                  AND claimed_at<?""",
+                (
+                    namespace,
+                    uid,
+                    content_key,
+                    group_id,
+                    now - DELIVERY_CLAIM_TTL,
+                ),
+            )
+            cursor = await db.execute(
+                """INSERT OR IGNORE INTO delivery_claims(
+                    namespace, uid, content_key, group_id, claimed_at
+                ) VALUES (?, ?, ?, ?, ?)""",
+                (namespace, uid, content_key, group_id, now),
+            )
+            await db.commit()
+            return cursor.rowcount == 1
+
+    async def release_delivery_claim(
+        self, namespace: str, uid: int, content_key: str, group_id: int
+    ) -> None:
+        async with self._connect() as db:
+            await db.execute(
+                """DELETE FROM delivery_claims
+                WHERE namespace=? AND uid=? AND content_key=? AND group_id=?""",
+                (namespace, uid, content_key, group_id),
             )
             await db.commit()
 

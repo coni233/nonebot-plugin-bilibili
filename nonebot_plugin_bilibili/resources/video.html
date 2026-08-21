@@ -15,13 +15,11 @@
     .badge { position: absolute; top: 14px; left: 0; padding: 5px 16px; border-radius: 0 14px 14px 0; background: var(--bili-theme); color: #fff; font-size: 12px; font-weight: 750; box-shadow: 0 3px 10px rgba(0, 0, 0, .16); }
     .cover-copy { position: absolute; right: 18px; bottom: 16px; left: 18px; color: #fff; }
     .title { margin: 0; font-size: 20px; line-height: 1.45; text-shadow: 0 2px 8px rgba(0, 0, 0, .35); }
-    .id { margin-top: 5px; color: rgba(255, 255, 255, .8); font-size: 11px; }
     .author-bar { display: flex; align-items: center; gap: 12px; padding: 16px 20px 12px; }
     .avatar { width: 46px; height: 46px; flex: 0 0 auto; border: 2px solid #eceff2; border-radius: 50%; background: #f2f3f5; object-fit: cover; }
     .author { min-width: 0; }
     .name { overflow: hidden; color: var(--bili-accent); font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
     .time { margin-top: 3px; color: #9499a0; font-size: 11px; }
-    .description { padding: 0 20px 16px; color: #61666d; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -30,13 +28,12 @@
       <section class="cover-wrap">
         {% if content.cover %}<img class="cover" src="{{ content.cover }}" alt="">{% endif %}
         <div class="shade"></div><div class="badge">投稿视频</div>
-        <div class="cover-copy"><h1 class="title">{{ content.title }}</h1><div class="id">{{ content.id }}</div></div>
+        <div class="cover-copy"><h1 class="title">{{ content.title }}</h1></div>
       </section>
       <section class="author-bar">
         {% if content.author_avatar %}<img class="avatar" src="{{ content.author_avatar }}" alt="">{% endif %}
         <div class="author"><div class="name">{{ content.author_name }}</div>{% if content.published_text %}<div class="time">发布时间 {{ content.published_text }}</div>{% endif %}</div>
       </section>
-      {% if content.text %}<div class="description">{{ content.text }}</div>{% endif %}
     </div>
   </article>
 </body>

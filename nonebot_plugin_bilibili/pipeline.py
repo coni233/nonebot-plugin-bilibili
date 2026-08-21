@@ -137,15 +137,25 @@ async def dispatch_content(content: PushContent) -> bool:
             namespace, content.uid, content_key, subscription.group_id
         ):
             continue
-        result = await _deliver_to_group(
-            subscription.group_id,
-            content,
-            subscription=subscription,
-        )
-        if result is DeliveryResult.FAILED:
+        if not await repository.claim_delivery(
+            namespace, content.uid, content_key, subscription.group_id
+        ):
             completed = False
-        else:
-            await repository.set_delivery_receipt(
+            continue
+        try:
+            result = await _deliver_to_group(
+                subscription.group_id,
+                content,
+                subscription=subscription,
+            )
+            if result is DeliveryResult.FAILED:
+                completed = False
+            else:
+                await repository.set_delivery_receipt(
+                    namespace, content.uid, content_key, subscription.group_id
+                )
+        finally:
+            await repository.release_delivery_claim(
                 namespace, content.uid, content_key, subscription.group_id
             )
     return completed

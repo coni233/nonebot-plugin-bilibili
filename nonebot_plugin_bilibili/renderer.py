@@ -28,6 +28,8 @@ ALLOWED_IMAGE_HOST_SUFFIXES = (
 )
 DEFAULT_ACCENT_COLOR = "#fb7299"
 COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+# Render at high-DPI so small text remains sharp after OneBot/QQ preview scaling.
+RENDER_DEVICE_SCALE_FACTOR = 2
 
 
 class CardRenderer:
@@ -190,7 +192,7 @@ class CardRenderer:
         browser = await self._get_browser()
         context = await browser.new_context(
             viewport={"width": plugin_config.bili_subscription_render_width, "height": 900},
-            device_scale_factor=1,
+            device_scale_factor=RENDER_DEVICE_SCALE_FACTOR,
             java_script_enabled=False,
         )
         page = await context.new_page()
